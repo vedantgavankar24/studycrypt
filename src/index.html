@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Crypto Monitor</h1>
+
+        <!-- Check Prices Section -->
+        <div class="card mb-4">
+            <div class="card-header">Check Crypto Prices</div>
+            <div class="card-body">
+                <form id="priceForm">
+                    <div class="mb-3">
+                        <label for="cryptos" class="form-label">Cryptocurrency</label>
+                        <select id="cryptos" class="form-select" required>
+                            <option value="" disabled selected>Select a cryptocurrency...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="currency" class="form-label">Currencies</label>
+                        <select id="currency" class="form-select" required>
+                            <option value="" disabled selected>Select a currency...</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Get Prices</button>
+                </form>
+                <div id="priceResults" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <script>
+        const apiUrl = "http://localhost:3000/api";
+
+        // Initialize Select2
+        $('#cryptos').select2({
+            placeholder: "Select cryptocurrencies",
+            allowClear: true
+        });
+
+        $('#currency').select2({
+            placeholder: "Select currency",
+            allowClear: true
+        });
+
+        // Fetch all cryptocurrencies and populate dropdown
+        async function populateCryptos() {
+            try {
+                const res = await fetch(`${apiUrl}/cryptos`);
+                const data = await res.json();
+
+                const dropdown = document.getElementById("cryptos");
+                dropdown.innerHTML = '<option value="" disabled selected>Select a cryptocurrency...</option>';
+
+                data.forEach(crypto => {
+                    const option = document.createElement("option");
+                    option.value = crypto.id; // Use the unique ID (e.g., bitcoin)
+                    option.text = crypto.name; // Use the human-readable name (e.g., Bitcoin)
+                    dropdown.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error fetching cryptocurrencies:", error);
+            }
+        }
+
+        // Fetch supported currencies and populate dropdown
+        async function populateCurrency() {
+            const dropdown = document.getElementById("currency");
+            try {
+                // Set a loading message initially
+                if (dropdown) {
+                    dropdown.innerHTML = '<option value="" disabled>Loading...</option>';
+                }
+
+                // Fetch currency data from the CoinGecko API
+                const res = await fetch("https://api.coingecko.com/api/v3/simple/supported_vs_currencies");
+                const data = await res.json();
+
+                // Populate the dropdown
+                dropdown.innerHTML = '<option value="" disabled selected>Select a currency...</option>';
+                data.forEach(currency => {
+                    const option = document.createElement("option");
+                    option.value = currency;  // Use the currency code as the value
+                    option.textContent = currency.toUpperCase();  // Display the currency code in uppercase
+                    dropdown.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error fetching currencies:", error);
+
+                // Show an error message in the dropdown
+                if (dropdown) {
+                    dropdown.innerHTML = '<option value="" disabled>Error loading currencies</option>';
+                }
+            }
+        }
+
+        // Call populateCryptos and populateCurrency on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            populateCryptos();
+            populateCurrency();
+        });
+
+        $('#priceForm').submit(async function(event) {
+            event.preventDefault();
+
+            const cryptos = $('#cryptos').val();
+            const currency = $('#currency').val();
+
+            if (!cryptos || !currency) {
+                alert("Please select both cryptocurrency and currency.");
+                return;
+            }
+
+            try {
+                const cryptoAPI = "https://api.coingecko.com/api/v3";
+                //  // Convert array to comma-separated string
+
+                // Fetch prices based on selected cryptocurrencies and currency
+                const res = await fetch(`${cryptoAPI}/simple/price?ids=${cryptos}&vs_currencies=${currency}`);
+                const data = await res.json();
+
+                const priceResults = document.getElementById("priceResults");
+
+                if (Object.keys(data).length === 0) {
+                    priceResults.innerHTML = '<div class="alert alert-warning">No data found for the selected cryptocurrencies.</div>';
+                } else {
+                    let resultHTML = '<ul class="list-group">';
+
+                    // Loop through each cryptocurrency and display its price
+                    for (let crypto in data) {
+                        if (data.hasOwnProperty(crypto)) {
+                            let price = data[crypto][currency];
+                            
+                            // Convert scientific notation to a decimal string
+                            price = price.toFixed(10); // You can adjust the number of decimal places as needed
+
+                            resultHTML += `<li class="list-group-item">The price of ${cryptos} in ${currency.toUpperCase()} is ${price}</li>`;
+                        }
+                    }
+
+                    resultHTML += '</ul>';
+                    priceResults.innerHTML = resultHTML;
+                }
+
+        
+
+            } catch (error) {
+                console.error("Error fetching prices:", error);
+                const priceResults = document.getElementById("priceResults");
+                priceResults.innerHTML = '<div class="alert alert-danger">Error fetching prices</div>';
+            }
+        });
+
+    </script>
+</body>
+</html>
