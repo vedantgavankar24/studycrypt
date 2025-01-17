@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import { connectDB } from "./utils/db";
 import priceRoutes from "./routes/priceRoutes";
 const path = require("path");
+const authRoutes = require('./routes/authRoutes');
+const nodemailer = require("nodemailer");
 
 dotenv.config();
 
@@ -20,9 +22,23 @@ const axios = require("axios");
 
 app.use("/api", priceRoutes);
 
-// app.get("/", (req, res) => {
-//   res.send("Welcome to the Crypto Monitoring System!");
-// });
+app.use('/', authRoutes);
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "home.html"));
+});
+
+app.get("/alertcrypto", (req, res) => {
+  res.sendFile(path.join(__dirname, "alertcrypto.html"));
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(__dirname, "login.html"));
+});
+
+app.get("/register", (req, res) => {
+  res.sendFile(path.join(__dirname, "register.html"));
+});
 
 app.get("/dashboard", (req, res) => {
   res.sendFile(path.join(__dirname, "dashboard.html"));
@@ -107,7 +123,40 @@ app.get("/api/crypto-history", async (req, res) => {
   }
 });
 
-  
+const transporter = nodemailer.createTransport({
+  service: "Gmail", // Use Gmail or another service
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+app.post("/send-alert", async (req, res) => {
+  const { email, crypto, currency, condition, threshold, currentPrice } = req.body;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Crypto Alert Triggered",
+    text: `Alert Triggered!
+    
+    Cryptocurrency: ${crypto}
+    Currency: ${currency}
+    Condition: ${condition}
+    Threshold: ${threshold}
+    Current Price: ${currentPrice}
+    
+    The alert condition has been satisfied.`,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    alert("Alert email sent successfully." );
+  } catch (error) {
+    console.error("Error sending email:", error);
+    alert("Failed to send email." );
+  }
+});
 
   
 // Start server

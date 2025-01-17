@@ -401,6 +401,9 @@
         // Call populateCryptos and populateCurrency on page load
         populateCryptos();
         populateCurrency();
+
+        let cache = {}; // In-memory cache
+        const CACHE_EXPIRY = 300000; 
     
         // Update selected values when dropdowns change
         $('#cryptos').on('change', function () {
@@ -414,6 +417,59 @@
             resetTimer();
             updatePrice(); // Immediately fetch price for new selection
         });
+
+        $('#priceForm').on('submit', async (event) => {
+        event.preventDefault();
+
+        const cryptoId = $('#cryptos').val();
+        const currency = $('#currency').val();
+
+        if (!cryptoId || !currency) {
+            alert('Please select a cryptocurrency and a currency.');
+            return;
+        }
+
+        const cacheKey = `${cryptoId}_${currency}`;
+        const currentTime = Date.now();
+
+        // Check cache for valid data
+        if (cache[cacheKey] && (currentTime - cache[cacheKey].timestamp < CACHE_EXPIRY)) {
+            displayPrice(cache[cacheKey].price, currency, true);
+        } else {
+            try {
+                const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoId}&vs_currencies=${currency}`);
+                if (!response.ok) throw new Error('API unavailable');
+
+                const data = await response.json();
+                const price = data[cryptoId]?.[currency];
+
+                if (price) {
+                    cache[cacheKey] = { price, timestamp: currentTime }; // Update cache
+                    displayPrice(price, currency, false);
+                } else {
+                    alert('Price data not available.');
+                }
+            } catch (error) {
+                console.warn('API error. Attempting to use cached data:', error);
+
+                if (cache[cacheKey]) {
+                    displayPrice(cache[cacheKey].price, currency, true);
+                } else {
+                    alert('Failed to retrieve price data from API or cache.');
+                }
+            }
+        }
+    });
+
+    function displayPrice(price, currency, fromCache) {
+        $('#priceResults').html(`
+        <div class="alert alert-info">
+            <p>Price:<strong> ${price} ${currency} </strong></p>
+            <p>Source: ${fromCache ? 'Cache' : 'API'}</p>
+            </div>
+            <div class="text-muted">Updating in <span id="timer">${countdown}</span> seconds...</div>
+        `);
+    }
     
         // Fetch and display price
         async function updatePrice() {
@@ -436,8 +492,6 @@
                 `;
                 }
             } catch (error) {
-                console.error("Error fetching price:", error);
-                document.getElementById("priceResults").innerHTML = '<div class="alert alert-danger">Failed to fetch price data.</div>';
             }
         }
     
